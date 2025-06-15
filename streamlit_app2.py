@@ -1,4 +1,4 @@
-# frontend/app.py
+# streamlit run streamlit_app2.py
 
 import streamlit as st
 import requests

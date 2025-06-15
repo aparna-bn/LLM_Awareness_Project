@@ -1,4 +1,4 @@
-# backend/main.py
+# uvicorn fastapi_app2:app --reload --port 8001
 
 import os
 from dotenv import load_dotenv
