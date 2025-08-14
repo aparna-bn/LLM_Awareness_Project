@@ -1,5 +1,4 @@
 # uvicorn fastapi_app2:app --reload --port 8001
-
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status # Import status for better clarity
