@@ -1,4 +1,5 @@
-# python global_news_tracker.py
+# global_news_tracker.py
+
 import feedparser
 import sqlite3
 import datetime
@@ -15,6 +16,7 @@ import webbrowser # New: For opening URLs in a web browser
 import requests  # For Gemini API calls
 import json      # For Gemini API calls
 from dotenv import load_dotenv  # For loading .env file
+import threading
 
 # --- Load environment variables from .env file ---
 load_dotenv()
@@ -228,7 +230,7 @@ def process_feed_entries(entries, category):
 # --- Sprint 1 Main Function ---
 def run_sprint1(conn): # Now accepts connection as an argument
     """Main function to execute Sprint 1 activities."""
-    
+    print("--- Starting Sprint 1: Data Acquisition Setup ---")
 
     # create_tables(conn) # This is now called in the main execution block
 
@@ -255,6 +257,7 @@ def run_sprint1(conn): # Now accepts connection as an argument
         # Optional: Be polite and pause between requests to avoid overwhelming servers
         # time.sleep(1) # Pause for 1 second between different feed fetches
 
+    print(f"\n--- Sprint 1 Complete ---")
     print(f"Total articles fetched across all feeds: {total_articles_fetched}")
     print(f"Total new articles inserted into database: {total_articles_inserted}")
     print(f"You can now inspect your '{DATABASE_NAME}' file (though it's still open).")
@@ -351,6 +354,8 @@ def group_articles_by_keyword_similarity(articles, threshold=0.1): # Adjusted th
 
 def run_sprint2(conn): # Now accepts connection as an argument
     """Main function to execute Sprint 2 activities."""
+    print("\n--- Starting Sprint 2: Data Preprocessing & Initial Topic Grouping ---")
+
     # --- Part 1: Data Preprocessing ---
     print("\n--- Part 1: Data Preprocessing (Cleaning Text) ---")
     articles_to_clean = get_articles_for_processing(conn)
@@ -409,8 +414,12 @@ def run_sprint2(conn): # Now accepts connection as an argument
         #         print(f"    - {original_article['title']}")
 
     # conn.close() # Connection will be closed by the main block
+    print("\n--- Sprint 2 Complete ---")
     print(f"Articles cleaned and initial topic grouping performed based on keyword similarity.")
     print(f"You can inspect the 'cleaned_text' and 'topic_id' columns in your '{DATABASE_NAME}' file.")
+
+
+# --- New Functions for Sprint 3: LLM Integration for Topic Summarization ---
 
 def get_llm_summary(text_to_summarize):
     """
@@ -482,6 +491,7 @@ def get_llm_summary(text_to_summarize):
 
 def run_sprint3(conn):
     """Main function to execute Sprint 3 activities: LLM summarization of topics."""
+    print("\n--- Starting Sprint 3: LLM Integration for Topic Summarization ---")
 
     print("\n--- Part 1: Summarizing Identified Topics with LLMs ---")
     grouped_articles_data = get_grouped_articles(conn)
@@ -526,11 +536,16 @@ def run_sprint3(conn):
 
     print(f"\nSuccessfully generated LLM summaries for {summarized_topics_count} topics.")
 
+    print("\n--- Sprint 3 Complete ---")
     print(f"Topic summaries generated and stored in the 'topics' table of '{DATABASE_NAME}'.")
 
 
+# --- New Functions for Sprint 4 (now GUI) ---
+
 def display_gui_dashboard(conn):
     """Main function to execute Sprint 5 activities: Presenting topics and summaries in a GUI."""
+    print("\n--- Starting Sprint 5: Graphical User Interface (GUI) Development ---")
+
     root = tk.Tk()
     root.title("Global News Topic Tracker")
     root.geometry("800x600") # Set initial window size
@@ -556,11 +571,11 @@ def display_gui_dashboard(conn):
     topics_display.config(state=tk.DISABLED) # Make it read-only
 
     # Define text tags for formatting
-    topics_display.tag_configure("topic_title", font=("Helvetica", 14, "bold"), foreground="dark blue", spacing3=6)      # Larger, bold, navy
-    topics_display.tag_configure("summary", font=("Arial", 12), foreground="black", spacing3=6)                     # Medium, black
-    topics_display.tag_configure("metadata", font=("Arial", 10, "italic"), foreground="gray", spacing3=4)           # Small, italic, gray
-    topics_display.tag_configure("article_title", font=("Helvetica", 11, "bold"), foreground="darkgreen", spacing3=4) # Medium, bold, green
-    topics_display.tag_configure("article_link", font=("Arial", 10, "underline"), foreground="blue", spacing3=4)    # Small, underline, blue
+    topics_display.tag_configure("topic_title", font=("Helvetica", 14, "bold"), foreground="dark blue", spacing3=6)
+    topics_display.tag_configure("summary", font=("Arial", 13, "bold"), foreground="black", background="#f0f8ff", spacing1=8, spacing3=8)  # Larger, bold, light blue background
+    topics_display.tag_configure("metadata", font=("Arial", 10, "italic"), foreground="gray", spacing3=4)
+    topics_display.tag_configure("article_title", font=("Helvetica", 11, "bold"), foreground="darkgreen", spacing3=4)
+    topics_display.tag_configure("article_link", font=("Arial", 10, "underline"), foreground="blue", spacing3=4)
     topics_display.tag_configure("separator", foreground="lightgray", spacing3=8)
 
     # Store URLs in a dictionary, mapped to their start index in the text widget
@@ -595,28 +610,46 @@ def display_gui_dashboard(conn):
         topics = get_all_topics_with_summaries(db_conn_for_display) # Use the passed connection
         
         if not topics:
-            topics_display.insert(tk.END, "No trending topics found. Click 'Run Pipeline' to fetch and process news.\n")
+            topics_display.insert(tk.END, "No trending topics found. Click 'Get News Summary' to fetch and process news.\n")
         else:
             for i, topic in enumerate(topics):
-                # Topic Title (remove topic_id from display)
-                topics_display.insert(tk.END, f"Topic {i+1}\n", "topic_title")
+                # Fetch the first related article's title as heading
+                cursor = db_conn_for_display.cursor()
+                cursor.execute('''
+                    SELECT title
+                    FROM articles
+                    WHERE topic_id = ?
+                    ORDER BY published DESC
+                    LIMIT 1
+                ''', (topic['topic_id'],))
+                heading_article = cursor.fetchone()
+                if heading_article:
+                    heading = heading_article['title']
+                else:
+                    heading = f"Topic {i+1}"
 
-                # Summary
-                topics_display.insert(tk.END, f"  Summary: ", "summary")
+                # Topic Heading
+                topics_display.insert(tk.END, f"{heading}\n", "topic_title")
+
+                # Add extra spacing before summary
+                topics_display.insert(tk.END, "\n", "summary")
+                # Summary (highlighted)
+                topics_display.insert(tk.END, f"Summary:\n", "summary")
                 topics_display.insert(tk.END, f"{topic['llm_summary']}\n", "summary")
+                # Add extra spacing after summary
+                topics_display.insert(tk.END, "\n", "summary")
 
                 # Last Updated
                 topics_display.insert(tk.END, f"  Last Updated: ", "metadata")
                 topics_display.insert(tk.END, f"{topic['last_updated']}\n", "metadata")
                 
                 # Fetch articles for this specific topic
-                cursor = db_conn_for_display.cursor() # Use the passed connection
                 cursor.execute('''
                     SELECT title, link
                     FROM articles
                     WHERE topic_id = ?
                     ORDER BY published DESC
-                    LIMIT 3 -- Show top 3 most recent articles for the topic
+                    LIMIT 3
                 ''', (topic['topic_id'],))
                 related_articles = cursor.fetchall()
 
@@ -625,57 +658,68 @@ def display_gui_dashboard(conn):
                     for article in related_articles:
                         topics_display.insert(tk.END, f"    - ", "article_title")
                         topics_display.insert(tk.END, f"{article['title']}\n", "article_title")
-                        
-                        # Insert link and apply both 'article_link' tag and a unique tag for the URL
                         link_text = f"      ({article['link']})\n"
-                        # The unique tag is created on the fly as "link_URL"
                         topics_display.insert(tk.END, link_text, ("article_link", f"link_{article['link']}"))
-
                 else:
                     topics_display.insert(tk.END, "  No related articles found for this topic.\n", "metadata")
                 
-                topics_display.insert(tk.END, "-" * 70 + "\n\n", "separator") # Separator for readability
-    
+                topics_display.insert(tk.END, "-" * 70 + "\n\n", "separator")
+        
         topics_display.config(state=tk.DISABLED)
+
+    # Progressbar for loading indication
+    progress = ttk.Progressbar(main_frame, mode="indeterminate")
+    progress.grid(row=3, column=0, pady=10)
+    progress.grid_remove()  # Hide initially
 
     def run_full_pipeline_and_refresh_gui():
         """Runs all sprints and then refreshes the GUI."""
-        messagebox.showinfo("Processing", "Starting news pipeline. This may take a moment...")
-        
-        # Disable button during processing
+        progress.grid()
+        progress.start(10)
         run_button.config(state=tk.DISABLED)
-        
-        # Ensure a clean database file before starting
-        if os.path.exists(DATABASE_NAME):
-            os.remove(DATABASE_NAME)
-            print(f"Removed existing database file: {DATABASE_NAME}")
+        root.update_idletasks()
 
-        # Establish a single connection for all sprints within this run
-        # This connection will be passed to sprints and then used to refresh GUI
-        pipeline_conn = connect_db() # Create new connection for pipeline run
-        if not pipeline_conn:
-            messagebox.showerror("Error", "Fatal: Could not establish database connection for pipeline.")
-            root.destroy()
-            return
-        
-        try:
-            # Create tables only once at the start of the pipeline run
-            create_tables(pipeline_conn) 
-            run_sprint1(pipeline_conn)
-            run_sprint2(pipeline_conn)
-            run_sprint3(pipeline_conn)
-            
-            # Now, refresh GUI using the *same* connection that just wrote the data
-            load_and_display_topics(pipeline_conn) # Pass the pipeline_conn
-            messagebox.showinfo("Success", "News pipeline completed and dashboard updated!")
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred during pipeline execution: {e}")
-        finally:
-            pipeline_conn.close() # Close the pipeline-specific connection
-            run_button.config(state=tk.NORMAL) # Re-enable button
+        # Show waiting message in the topics_display box
+        topics_display.config(state=tk.NORMAL)
+        topics_display.delete(1.0, tk.END)
+        topics_display.insert(tk.END, "Collecting the news. Please wait...\n")
+        topics_display.config(state=tk.DISABLED)
+
+        def pipeline_task():
+            try:
+                if os.path.exists(DATABASE_NAME):
+                    os.remove(DATABASE_NAME)
+                    print(f"Removed existing database file: {DATABASE_NAME}")
+
+                pipeline_conn = connect_db()
+                if not pipeline_conn:
+                    root.after(0, lambda: messagebox.showerror("Error", "Fatal: Could not establish database connection for pipeline."))
+                    root.after(0, progress.stop)
+                    root.after(0, progress.grid_remove)
+                    root.after(0, root.destroy)
+                    return
+
+                create_tables(pipeline_conn)
+                run_sprint1(pipeline_conn)
+                run_sprint2(pipeline_conn)
+                run_sprint3(pipeline_conn)
+
+                # Instead of passing pipeline_conn, just signal the main thread to reload topics
+                root.after(0, lambda: load_and_display_topics(connect_db()))
+                root.after(0, lambda: messagebox.showinfo("Success", "News pipeline completed and dashboard updated!"))
+            except Exception as e:
+                root.after(0, lambda: messagebox.showerror("Error", f"An error occurred during pipeline execution: {e}"))
+            finally:
+                if pipeline_conn:
+                    pipeline_conn.close()
+                root.after(0, lambda: run_button.config(state=tk.NORMAL))
+                root.after(0, progress.stop)
+                root.after(0, progress.grid_remove)
+
+        threading.Thread(target=pipeline_task, daemon=True).start()
 
     # Run Pipeline Button
-    run_button = ttk.Button(main_frame, text="Run Pipeline & Refresh", command=run_full_pipeline_and_refresh_gui)
+    run_button = ttk.Button(main_frame, text="Get News Summary", command=run_full_pipeline_and_refresh_gui)
     run_button.grid(row=2, column=0, pady=10)
 
     # Initial load of topics (using the main_conn)
@@ -683,6 +727,8 @@ def display_gui_dashboard(conn):
     load_and_display_topics(conn) # Pass the main_conn here for initial display
 
     root.mainloop() # Start the Tkinter event loop
+    print("\n--- Sprint 5 Complete: GUI Dashboard Displayed ---")
+
 
 # --- Main Execution Flow ---
 
