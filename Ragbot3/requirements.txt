@@ -1,0 +1,14 @@
+streamlit
+torch
+transformers
+langchain
+langchain-text-splitters
+langchain-community
+langchain-chroma
+langchain-huggingface
+langchain-core
+pypdf
+docx2txt
+sentence-transformers
+chromadb
+accelerate

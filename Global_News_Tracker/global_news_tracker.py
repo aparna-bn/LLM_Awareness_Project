@@ -1,11 +1,11 @@
 # global_news_tracker.py
 
-import feedparser
+import feedparser  #data fetching
 import sqlite3
 import datetime
 import time
 import hashlib
-import re # For regular expressions, used in text cleaning
+import re  # For regular expressions, used in text cleaning
 from collections import defaultdict, Counter # For grouping and counting words
 from sklearn.feature_extraction.text import TfidfVectorizer # For more sophisticated keyword extraction
 from sklearn.metrics.pairwise import cosine_similarity # For comparing similarity between articles

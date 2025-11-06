@@ -1,4 +1,4 @@
-# main.py (Simplified UI)
+# streamlit run main.py
 import streamlit as st
 import os
 from datetime import datetime
